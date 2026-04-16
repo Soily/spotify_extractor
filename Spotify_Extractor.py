@@ -21,7 +21,6 @@ LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
     raise ValueError("Spotify credentials not set in environment variables.")
 
-
 # =============================
 # HELPERS
 # =============================
@@ -44,34 +43,74 @@ def safe_request(url, params=None):
 
 
 # =============================
-# INSTAGRAM (NEW STRATEGY)
+# MONTHLY LISTENERS (FIXED)
 # =============================
-def extract_instagram_from_text(text):
-    if not text:
-        return None
+def get_monthly_listeners(artist_id):
+    url = f"https://open.spotify.com/artist/{artist_id}"
 
-    matches = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', text)
-    return matches[0] if matches else None
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+        html = response.text
+
+        # More robust regex
+        match = re.search(r'([0-9.,]+)\s*monthly listeners', html, re.IGNORECASE)
+
+        if match:
+            listeners = int(match.group(1).replace(",", "").replace(".", ""))
+            print(f"✔ Monthly listeners: {listeners}")
+            return listeners
+        else:
+            print("⚠ Monthly listeners not found")
+
+    except Exception as e:
+        print(f"Monthly listener error: {e}")
+
+    return None
 
 
+# =============================
+# INSTAGRAM (HYBRID)
+# =============================
 def find_instagram_profile(artist_name, lastfm_url=None, wiki_url=None):
-    # 1. Try Wikipedia
+    # Wikipedia
     if wiki_url:
         try:
-            html = requests.get(wiki_url).text
-            ig = extract_instagram_from_text(html)
+            html = requests.get(wiki_url, timeout=10).text
+            ig = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
             if ig:
-                return ig, 5
+                return ig[0], 5
         except:
             pass
 
-    # 2. Try Last.fm
+    # Last.fm
     if lastfm_url:
         try:
-            html = requests.get(lastfm_url).text
-            ig = extract_instagram_from_text(html)
+            html = requests.get(lastfm_url, timeout=10).text
+            ig = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
             if ig:
-                return ig, 4
+                return ig[0], 4
+        except:
+            pass
+
+    # Heuristic guesses
+    clean = re.sub(r'[^a-z0-9]', '', artist_name.lower())
+
+    guesses = [
+        clean,
+        clean + "official",
+        clean + "music"
+    ]
+
+    for username in guesses:
+        url = f"https://www.instagram.com/{username}/"
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                return url, 3
         except:
             pass
 
@@ -105,7 +144,8 @@ def get_spotify_data(artist_name):
         "spotify_url": artist["external_urls"]["spotify"],
         "followers": artist.get("followers", {}).get("total", 0),
         "popularity": artist.get("popularity", 0),
-        "genres": artist.get("genres", [])
+        "genres": artist.get("genres", []),
+        "monthly_listeners": get_monthly_listeners(artist_id)
     }
 
     return data
@@ -166,6 +206,7 @@ def flatten_artist_data(data):
         "spotify_url": data.get("spotify_url"),
         "followers": data.get("followers"),
         "popularity": data.get("popularity"),
+        "monthly_listeners": data.get("monthly_listeners"),
         "genres": ", ".join(data.get("genres", [])),
         "tags": ", ".join(data.get("tags", [])),
         "lastfm_url": data.get("lastfm_url"),
@@ -224,14 +265,14 @@ def process_artists_from_file(filename):
         artists = [line.strip() for line in f if line.strip()]
 
     for artist in artists:
-        print(f"Processing: {artist}")
+        print(f"\nProcessing: {artist}")
 
         data = get_full_artist_profile(artist)
 
         if data:
             save_to_csv(data)
 
-        time.sleep(0.5)
+        time.sleep(1)
 
 
 # =============================
