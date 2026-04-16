@@ -43,7 +43,6 @@ def safe_request(url, params=None):
 
 
 def get_monthly_listeners(artist_id):
-    """Scrape monthly listeners from Spotify web page (unofficial)."""
     url = f"https://open.spotify.com/artist/{artist_id}"
 
     try:
@@ -299,7 +298,7 @@ def get_full_artist_profile(artist_name):
 # =============================
 def process_artists_from_file(filename):
     if not os.path.isfile(filename):
-        print(f"File not found: {filename}")
+        print(f"❌ File not found: {filename}")
         return
 
     with open(filename, "r", encoding="utf-8") as f:
@@ -320,7 +319,7 @@ def process_artists_from_file(filename):
             save_to_csv(data)
             print("✅ Saved")
 
-            time.sleep(0.5)  # avoid rate limits
+            time.sleep(0.5)
 
         except Exception as e:
             print(f"⚠️ Error: {e}")
@@ -330,26 +329,10 @@ def process_artists_from_file(filename):
 
 
 # =============================
-# MAIN
+# MAIN (AUTO-BATCH)
 # =============================
 if __name__ == "__main__":
-    mode = input("Mode (single/batch): ").strip().lower()
+    filename = "input_artists_list.txt"
 
-    if mode == "batch":
-        filename = input("Enter path to artist file (e.g. artists.txt): ").strip()
-        process_artists_from_file(filename)
-
-    else:
-        artist_name = input("Artist Name: ").strip()
-
-        data = get_full_artist_profile(artist_name)
-
-        if not data:
-            print("Artist nicht gefunden.")
-        else:
-            print("\n===== ARTIST PROFILE =====\n")
-            for key, value in data.items():
-                print(f"{key}: {value}")
-
-            save_to_csv(data)
-            print("\n✅ Data saved to artist_data.csv")
+    print(f"📂 Using artist list: {filename}")
+    process_artists_from_file(filename)
