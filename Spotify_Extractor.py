@@ -59,6 +59,9 @@ def get_monthly_listeners(artist_id):
     return None
 
 
+# =============================
+# INSTAGRAM (SCORING)
+# =============================
 def find_instagram_profile(artist_name):
     query = f'site:instagram.com "{artist_name}"'
     url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
@@ -70,22 +73,35 @@ def find_instagram_profile(artist_name):
 
         matches = re.findall(r"https://www\.instagram\.com/[A-Za-z0-9_.]+", html)
 
+        best_match = None
+        best_score = 0
+
+        clean_name = re.sub(r'[^a-z0-9]', '', artist_name.lower())
+
         for link in matches:
             username = link.split("/")[-1].lower()
-
-            clean_name = re.sub(r'[^a-z0-9]', '', artist_name.lower())
             clean_user = re.sub(r'[^a-z0-9]', '', username)
 
-            if clean_name in clean_user:
-                return link
+            score = 0
 
-        if matches:
-            return matches[0]
+            # Strong match
+            if clean_name == clean_user:
+                score += 5
+            elif clean_name in clean_user:
+                score += 3
+
+            # Weak match
+            if artist_name.lower() in username:
+                score += 2
+
+            if score > best_score:
+                best_score = score
+                best_match = link
+
+        return best_match, best_score
 
     except Exception:
-        pass
-
-    return None
+        return None, 0
 
 
 # =============================
@@ -276,7 +292,8 @@ def flatten_artist_data(data):
         "lastfm_url": data.get("lastfm_url"),
         "wikipedia": data.get("wikipedia"),
         "tags": ", ".join(data.get("tags", [])),
-        "instagram": data.get("instagram")
+        "instagram": data.get("instagram"),
+        "instagram_score": data.get("instagram_score")
     }
 
     top_tracks = data.get("top_tracks", [])
@@ -296,7 +313,11 @@ def save_to_csv(data, filename="artist_data.csv"):
     file_exists = os.path.isfile(filename)
 
     with open(filename, mode="a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=flat_data.keys())
+        writer = csv.DictWriter(
+            f,
+            fieldnames=flat_data.keys(),
+            quoting=csv.QUOTE_ALL  # FIXED CSV ISSUE
+        )
 
         if not file_exists:
             writer.writeheader()
@@ -314,7 +335,8 @@ def get_full_artist_profile(artist_name):
 
     lastfm = get_lastfm_data(artist_name)
     wiki = get_wikipedia_link(artist_name)
-    instagram = find_instagram_profile(artist_name)
+
+    instagram, score = find_instagram_profile(artist_name)
 
     full_data = {**spotify, **lastfm}
 
@@ -323,6 +345,7 @@ def get_full_artist_profile(artist_name):
 
     if instagram:
         full_data["instagram"] = instagram
+        full_data["instagram_score"] = score
 
     return full_data
 
@@ -351,7 +374,7 @@ def process_artists_from_file(filename):
                 continue
 
             save_to_csv(data)
-            print("✅ Saved")
+            print(f"✅ Saved (IG score: {data.get('instagram_score', 0)})")
 
             time.sleep(0.5)
 
