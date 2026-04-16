@@ -1,4 +1,5 @@
 import os
+import csv
 import requests
 import urllib.parse
 import re
@@ -45,27 +46,17 @@ def get_monthly_listeners(artist_id):
     url = f"https://open.spotify.com/artist/{artist_id}"
 
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=10)
         html = response.text
 
         match = re.search(r'([0-9.,]+)\smonthly listeners', html)
         if match:
-            return match.group(1)
-
+            return int(match.group(1).replace(",", "").replace(".", ""))
     except Exception:
         pass
 
     return None
-
-
-def parse_listeners(value):
-    """Convert '1,234,567' → 1234567"""
-    if not value:
-        return None
-    return int(value.replace(",", "").replace(".", ""))
 
 
 # =============================
@@ -141,10 +132,6 @@ def get_spotify_data(artist_name):
     except Exception:
         return None
 
-    # 🎧 Monthly listeners (scraped)
-    raw_listeners = get_monthly_listeners(artist_id)
-    monthly_listeners = parse_listeners(raw_listeners)
-
     data = {
         "name": artist.get("name"),
         "spotify_url": artist.get("external_urls", {}).get("spotify"),
@@ -152,7 +139,7 @@ def get_spotify_data(artist_name):
         "popularity": artist.get("popularity", 0),
         "genres": artist.get("genres", []),
         "image": artist.get("images", [{}])[0].get("url") if artist.get("images") else None,
-        "monthly_listeners": monthly_listeners
+        "monthly_listeners": get_monthly_listeners(artist_id)
     }
 
     # Top tracks
@@ -246,6 +233,50 @@ def get_wikipedia_link(artist_name):
 
 
 # =============================
+# CSV EXPORT
+# =============================
+def flatten_artist_data(data):
+    flat = {
+        "name": data.get("name"),
+        "spotify_url": data.get("spotify_url"),
+        "followers": data.get("followers"),
+        "popularity": data.get("popularity"),
+        "monthly_listeners": data.get("monthly_listeners"),
+        "genres": ", ".join(data.get("genres", [])),
+        "image": data.get("image"),
+        "lastfm_url": data.get("lastfm_url"),
+        "wikipedia": data.get("wikipedia"),
+        "tags": ", ".join(data.get("tags", []))
+    }
+
+    # Top tracks
+    top_tracks = data.get("top_tracks", [])
+    flat["top_tracks"] = ", ".join([t.get("name", "") for t in top_tracks])
+
+    # Latest release
+    latest = data.get("latest_release", {})
+    flat["latest_release_name"] = latest.get("name")
+    flat["latest_release_date"] = latest.get("release_date")
+    flat["latest_release_url"] = latest.get("url")
+
+    return flat
+
+
+def save_to_csv(data, filename="artist_data.csv"):
+    flat_data = flatten_artist_data(data)
+
+    file_exists = os.path.isfile(filename)
+
+    with open(filename, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=flat_data.keys())
+
+        if not file_exists:
+            writer.writeheader()
+
+        writer.writerow(flat_data)
+
+
+# =============================
 # MERGE
 # =============================
 def get_full_artist_profile(artist_name):
@@ -278,3 +309,6 @@ if __name__ == "__main__":
         print("\n===== ARTIST PROFILE =====\n")
         for key, value in data.items():
             print(f"{key}: {value}")
+
+        save_to_csv(data)
+        print("\n✅ Data saved to artist_data.csv")
