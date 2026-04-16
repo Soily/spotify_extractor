@@ -34,6 +34,7 @@ LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
     raise ValueError("Spotify credentials not set in environment variables.")
 
+
 # =============================
 # HELPERS
 # =============================
@@ -41,20 +42,45 @@ def parse_date(date_str):
     for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
         try:
             return datetime.strptime(date_str, fmt)
-        except:
+        except Exception:
             continue
     return datetime.min
 
 
 def safe_request(url, params=None):
+    """
+    Generic JSON GET with proper User-Agent so Wikipedia / APIs don't 403.
+    """
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (compatible; ArtistProfileCollector/1.0; "
+            "+https://example.com/artist-scraper)"
+        )
+    }
     try:
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, headers=headers, timeout=10)
         log(f"REQUEST OK → {url} ({response.status_code})")
         response.raise_for_status()
         return response.json()
     except Exception as e:
         log(f"REQUEST FAILED → {url} | {e}")
         return None
+
+
+def extract_instagram_links(html):
+    """
+    Extract Instagram profile URLs from HTML and filter out known non-artist accounts
+    like Last.fm's own profile.
+    """
+    raw_links = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
+    blacklist_substrings = ["last_fm", "last.fm", "instagram.com/instagram"]
+    cleaned = []
+    for link in raw_links:
+        lower = link.lower()
+        if any(bad in lower for bad in blacklist_substrings):
+            continue
+        cleaned.append(link)
+    return cleaned
 
 
 # =============================
@@ -91,22 +117,24 @@ def find_instagram_profile(artist_name, lastfm_url=None, wiki_url=None):
     # Wikipedia
     if wiki_url:
         try:
-            html = requests.get(wiki_url, timeout=10).text
-            ig = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
-            if ig:
-                log(f"Instagram found via Wikipedia: {ig[0]}")
-                return ig[0], 5
+            headers = {"User-Agent": "Mozilla/5.0"}
+            html = requests.get(wiki_url, headers=headers, timeout=10).text
+            ig_links = extract_instagram_links(html)
+            if ig_links:
+                log(f"Instagram found via Wikipedia: {ig_links[0]}")
+                return ig_links[0], 5
         except Exception as e:
             log(f"Wikipedia IG error: {e}")
 
     # Last.fm
     if lastfm_url:
         try:
-            html = requests.get(lastfm_url, timeout=10).text
-            ig = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
-            if ig:
-                log(f"Instagram found via Last.fm: {ig[0]}")
-                return ig[0], 4
+            headers = {"User-Agent": "Mozilla/5.0"}
+            html = requests.get(lastfm_url, headers=headers, timeout=10).text
+            ig_links = extract_instagram_links(html)
+            if ig_links:
+                log(f"Instagram found via Last.fm: {ig_links[0]}")
+                return ig_links[0], 4
         except Exception as e:
             log(f"Last.fm IG error: {e}")
 
@@ -144,17 +172,43 @@ def get_spotify_client():
     return spotipy.Spotify(auth_manager=auth_manager)
 
 
+def _select_best_spotify_artist(items, artist_name):
+    """
+    Prefer exact name match (case-insensitive), then highest popularity.
+    """
+    if not items:
+        return None
+
+    target = artist_name.strip().lower()
+
+    def score(a):
+        name = a.get("name", "").strip().lower()
+        exact = (name == target)
+        popularity = a.get("popularity", 0) or 0
+        # exact match first, then popularity
+        return (1 if exact else 0, popularity)
+
+    best = max(items, key=score)
+    return best
+
+
 def get_spotify_data(artist_name):
     sp = get_spotify_client()
 
     try:
-        results = sp.search(q=artist_name, type="artist", limit=1)
+        # Use artist: query and allow multiple results, then pick best match
+        results = sp.search(q=f"artist:{artist_name}", type="artist", limit=5)
 
-        if not results["artists"]["items"]:
+        items = results.get("artists", {}).get("items", [])
+        if not items:
             log("Spotify: artist not found")
             return None
 
-        artist = results["artists"]["items"][0]
+        artist = _select_best_spotify_artist(items, artist_name)
+        if not artist:
+            log("Spotify: no suitable artist match")
+            return None
+
         artist_id = artist["id"]
 
         log(f"Spotify artist found: {artist['name']}")
