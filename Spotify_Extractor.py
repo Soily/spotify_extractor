@@ -1,6 +1,7 @@
 import os
 import requests
 import urllib.parse
+import re
 from datetime import datetime
 from dotenv import load_dotenv
 import spotipy
@@ -37,6 +38,34 @@ def safe_request(url, params=None):
         return response.json()
     except requests.RequestException:
         return None
+
+
+def get_monthly_listeners(artist_id):
+    """Scrape monthly listeners from Spotify web page (unofficial)."""
+    url = f"https://open.spotify.com/artist/{artist_id}"
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        html = response.text
+
+        match = re.search(r'([0-9.,]+)\smonthly listeners', html)
+        if match:
+            return match.group(1)
+
+    except Exception:
+        pass
+
+    return None
+
+
+def parse_listeners(value):
+    """Convert '1,234,567' → 1234567"""
+    if not value:
+        return None
+    return int(value.replace(",", "").replace(".", ""))
 
 
 # =============================
@@ -86,7 +115,6 @@ def get_all_releases(sp, artist_id):
         except Exception:
             break
 
-    # Deduplicate
     seen = set()
     unique = []
 
@@ -108,11 +136,14 @@ def get_spotify_data(artist_name):
 
     artist_id = artist.get("id")
 
-    # 🔥 Get full artist object
     try:
         artist = sp.artist(artist_id)
     except Exception:
         return None
+
+    # 🎧 Monthly listeners (scraped)
+    raw_listeners = get_monthly_listeners(artist_id)
+    monthly_listeners = parse_listeners(raw_listeners)
 
     data = {
         "name": artist.get("name"),
@@ -120,10 +151,11 @@ def get_spotify_data(artist_name):
         "followers": artist.get("followers", {}).get("total", 0),
         "popularity": artist.get("popularity", 0),
         "genres": artist.get("genres", []),
-        "image": artist.get("images", [{}])[0].get("url") if artist.get("images") else None
+        "image": artist.get("images", [{}])[0].get("url") if artist.get("images") else None,
+        "monthly_listeners": monthly_listeners
     }
 
-    # Top tracks with fallback
+    # Top tracks
     try:
         top_tracks = sp.artist_top_tracks(artist_id, country="DE")
 
