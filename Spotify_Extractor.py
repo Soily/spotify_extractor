@@ -71,15 +71,6 @@ instagram_cache = {}
 # =============================
 # HELPERS
 # =============================
-def parse_date(date_str):
-    for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except Exception:
-            continue
-    return None
-
-
 def similarity(a, b):
     a = (a or "").lower().strip()
     b = (b or "").lower().strip()
@@ -164,7 +155,6 @@ def extract_social_links_from_html(html):
     socials["youtube"] = list(dict.fromkeys(yt_links))
     socials["tiktok"] = list(dict.fromkeys(tt_links))
 
-    # crude website filtering: drop obvious social domains
     website_clean = []
     for link in web_links:
         lower = link.lower()
@@ -180,20 +170,17 @@ def extract_social_links_from_html(html):
 def extract_birth_info_from_wiki_html(html):
     """
     Very rough extraction of birth date / origin from Wikipedia HTML.
-    This is heuristic and not guaranteed.
     """
     if not html:
         return {}
 
     info = {}
 
-    # birth date patterns
     birth_match = re.search(r'Born</th>\s*<td[^>]*>(.*?)</td>', html, re.IGNORECASE | re.DOTALL)
     if birth_match:
         text = re.sub(r'<.*?>', ' ', birth_match.group(1))
         info["birth_raw"] = " ".join(text.split())
 
-    # origin / place
     origin_match = re.search(r'Origin</th>\s*<td[^>]*>(.*?)</td>', html, re.IGNORECASE | re.DOTALL)
     if origin_match:
         text = re.sub(r'<.*?>', ' ', origin_match.group(1))
@@ -233,7 +220,6 @@ def get_monthly_listeners(artist_id):
 def validate_instagram_profile(url, artist_name):
     """
     Validate guessed Instagram profile by checking HTML for basic signals.
-    Optionally extract follower count.
     """
     if not url:
         return None, 0, None
@@ -247,25 +233,23 @@ def validate_instagram_profile(url, artist_name):
             instagram_cache[url] = (None, 0, None)
             return None, 0, None
 
-        # crude follower extraction (Instagram changes often; this is best-effort)
         followers = None
         follower_match = re.search(r'"edge_followed_by":{"count":(\d+)}', html)
         if follower_match:
             followers = int(follower_match.group(1))
 
-        # basic signals
         has_posts = '"edge_owner_to_timeline_media":{"count":' in html
         is_private = '"is_private":true' in html
         name_similarity = similarity(artist_name, url.split("instagram.com/")[-1].strip("/"))
 
         score = 0
         if followers:
-            score += min(3, math.log10(followers + 1))  # 0–3
+            score += min(3, math.log10(followers + 1))
         if has_posts:
             score += 1
         if not is_private:
             score += 1
-        score += name_similarity * 3  # up to 3
+        score += name_similarity * 3
 
         instagram_cache[url] = (url, score, followers)
         return url, score, followers
@@ -374,44 +358,13 @@ def _select_best_spotify_artist(items, artist_name):
         sim = similarity(name_lower, target)
         popularity = a.get("popularity", 0) or 0
         return (
-            1 if exact else 0,   # exact match first
-            sim,                 # then similarity
-            popularity           # then popularity
+            1 if exact else 0,
+            sim,
+            popularity
         )
 
     best = max(items, key=score)
     return best
-
-
-def _get_spotify_releases(sp, artist_id):
-    """
-    Fetch earliest and latest release dates for the artist.
-    """
-    try:
-        albums = []
-        results = sp.artist_albums(artist_id, album_type="album,single", limit=50)
-        albums.extend(results.get("items", []))
-        while results.get("next"):
-            results = sp.next(results)
-            albums.extend(results.get("items", []))
-
-        dates = []
-        for a in albums:
-            d = parse_date(a.get("release_date", ""))
-            if d:
-                dates.append(d)
-
-        if not dates:
-            return None, None, None
-
-        earliest = min(dates)
-        latest = max(dates)
-        span_years = (latest - earliest).days / 365.25
-
-        return earliest.date().isoformat(), latest.date().isoformat(), round(span_years, 2)
-    except Exception as e:
-        log(f"Spotify releases error: {e}", level="ERROR")
-        return None, None, None
 
 
 def get_spotify_data(artist_name):
@@ -421,11 +374,9 @@ def get_spotify_data(artist_name):
     sp = get_spotify_client()
 
     try:
-        # primary: artist: query
         results = sp.search(q=f"artist:{artist_name}", type="artist", limit=10)
         items = results.get("artists", {}).get("items", [])
 
-        # fallback: generic query if nothing found
         if not items:
             results = sp.search(q=artist_name, type="artist", limit=10)
             items = results.get("artists", {}).get("items", [])
@@ -445,7 +396,6 @@ def get_spotify_data(artist_name):
         log(f"Spotify artist found: {artist['name']}")
 
         monthly_listeners = get_monthly_listeners(artist_id)
-        earliest_release, latest_release, span_years = _get_spotify_releases(sp, artist_id)
 
         images = artist.get("images", [])
         image_url = images[0]["url"] if images else None
@@ -458,9 +408,10 @@ def get_spotify_data(artist_name):
             "genres": artist.get("genres", []),
             "monthly_listeners": monthly_listeners,
             "spotify_image": image_url,
-            "spotify_earliest_release": earliest_release,
-            "spotify_latest_release": latest_release,
-            "spotify_career_span_years": span_years,
+            # release scraping disabled (Option B)
+            "spotify_earliest_release": None,
+            "spotify_latest_release": None,
+            "spotify_career_span_years": None,
         }
 
         spotify_cache[artist_name] = data
@@ -527,9 +478,6 @@ def get_lastfm_data(artist_name):
 # WIKIPEDIA
 # =============================
 def _wikipedia_search_title(artist_name):
-    """
-    Fallback search for Wikipedia page title.
-    """
     search_url = "https://en.wikipedia.org/w/api.php"
     params = {
         "action": "query",
@@ -546,7 +494,6 @@ def _wikipedia_search_title(artist_name):
     if not results:
         return None
 
-    # pick best by similarity
     best = max(results, key=lambda r: similarity(r.get("title", ""), artist_name))
     return best.get("title")
 
@@ -565,7 +512,6 @@ def get_wikipedia_link(artist_name):
         return None
 
     if "type" in data and data["type"] == "https://mediawiki.org/wiki/HyperSwitch/errors/not_found":
-        # try fallback search
         title = _wikipedia_search_title(artist_name)
         if not title:
             log("Wikipedia not found (after search)")
@@ -586,9 +532,6 @@ def get_wikipedia_link(artist_name):
 
 
 def get_wikipedia_extended_data(page_url):
-    """
-    Fetch HTML and extract social links and basic bio info.
-    """
     if not page_url:
         return {}
 
@@ -662,23 +605,17 @@ def save_to_csv(data, filename=CSV_FILE):
 def compute_source_quality_score(profile):
     score = 0.0
 
-    # Spotify confidence
     if profile.get("spotify_url"):
         score += 2
     if profile.get("monthly_listeners") is not None:
         score += 1
-    if profile.get("spotify_career_span_years") is not None:
-        score += 1
 
-    # Instagram confidence
     ig_score = profile.get("instagram_score") or 0
     score += min(3, ig_score / 2.0)
 
-    # Wikipedia presence
     if profile.get("wikipedia"):
         score += 2
 
-    # Last.fm presence
     if profile.get("lastfm_url"):
         score += 1
     if profile.get("lastfm_bio"):
@@ -699,8 +636,6 @@ def compute_data_completeness(profile):
         "lastfm_bio",
         "wikipedia",
         "instagram",
-        "spotify_earliest_release",
-        "spotify_latest_release",
     ]
     present = 0
     for f in fields:
@@ -740,7 +675,6 @@ def get_full_artist_profile(artist_name):
     if wiki_url:
         full["wikipedia"] = wiki_url
 
-    # wiki socials
     full["wiki_instagram"] = wiki_extended.get("instagram", [])
     full["wiki_facebook"] = wiki_extended.get("facebook", [])
     full["wiki_youtube"] = wiki_extended.get("youtube", [])
@@ -759,7 +693,10 @@ def get_full_artist_profile(artist_name):
     full["data_completeness"] = compute_data_completeness(full)
 
     elapsed = time.time() - start_time
-    log(f"Finished {artist_name} in {elapsed:.2f}s (quality={full['source_quality_score']}, completeness={full['data_completeness']}%)")
+    log(
+        f"Finished {artist_name} in {elapsed:.2f}s "
+        f"(quality={full['source_quality_score']}, completeness={full['data_completeness']}%)"
+    )
 
     return full
 
@@ -782,7 +719,6 @@ def process_artists_from_file(filename):
     with open(filename, "r", encoding="utf-8") as f:
         artists = [line.strip() for line in f if line.strip()]
 
-    # parallel processing with rate-conscious behavior
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(_process_single_artist, artist): artist for artist in artists}
         for future in as_completed(futures):
