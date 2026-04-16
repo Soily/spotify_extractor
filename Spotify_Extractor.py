@@ -59,6 +59,35 @@ def get_monthly_listeners(artist_id):
     return None
 
 
+def find_instagram_profile(artist_name):
+    query = f'site:instagram.com "{artist_name}"'
+    url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        html = response.text
+
+        matches = re.findall(r"https://www\.instagram\.com/[A-Za-z0-9_.]+", html)
+
+        for link in matches:
+            username = link.split("/")[-1].lower()
+
+            clean_name = re.sub(r'[^a-z0-9]', '', artist_name.lower())
+            clean_user = re.sub(r'[^a-z0-9]', '', username)
+
+            if clean_name in clean_user:
+                return link
+
+        if matches:
+            return matches[0]
+
+    except Exception:
+        pass
+
+    return None
+
+
 # =============================
 # SPOTIFY
 # =============================
@@ -246,7 +275,8 @@ def flatten_artist_data(data):
         "image": data.get("image"),
         "lastfm_url": data.get("lastfm_url"),
         "wikipedia": data.get("wikipedia"),
-        "tags": ", ".join(data.get("tags", []))
+        "tags": ", ".join(data.get("tags", [])),
+        "instagram": data.get("instagram")
     }
 
     top_tracks = data.get("top_tracks", [])
@@ -284,11 +314,15 @@ def get_full_artist_profile(artist_name):
 
     lastfm = get_lastfm_data(artist_name)
     wiki = get_wikipedia_link(artist_name)
+    instagram = find_instagram_profile(artist_name)
 
     full_data = {**spotify, **lastfm}
 
     if wiki:
         full_data["wikipedia"] = wiki
+
+    if instagram:
+        full_data["instagram"] = instagram
 
     return full_data
 
@@ -332,7 +366,12 @@ def process_artists_from_file(filename):
 # MAIN (AUTO-BATCH)
 # =============================
 if __name__ == "__main__":
-    filename = "input_artists_list.txt"
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    filename = os.path.join(BASE_DIR, "input_artists.txt")
+
+    if not os.path.isfile(filename):
+        print(f"❌ File not found: {filename}")
+        exit(1)
 
     print(f"📂 Using artist list: {filename}")
     process_artists_from_file(filename)
