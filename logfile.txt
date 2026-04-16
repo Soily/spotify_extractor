@@ -1,18 +1,55 @@
-[2026-04-16 19:08:19] 
-=== PROCESSING Drake ===
-[2026-04-16 19:08:20] Monthly listeners found: 88912290
-[2026-04-16 19:08:20] Searching Instagram for: Drake
-[2026-04-16 19:08:20] No vqd token found
-[2026-04-16 19:08:20] Saved to CSV
-[2026-04-16 19:08:22] 
-=== PROCESSING Taylor Swift ===
-[2026-04-16 19:08:23] Monthly listeners found: 101993955
-[2026-04-16 19:08:23] Searching Instagram for: Taylor Swift
-[2026-04-16 19:08:23] No vqd token found
-[2026-04-16 19:08:23] Saved to CSV
-[2026-04-16 19:08:25] 
-=== PROCESSING Kendrick Lamar ===
-[2026-04-16 19:08:26] Monthly listeners found: 72075872
-[2026-04-16 19:08:26] Searching Instagram for: Kendrick Lamar
-[2026-04-16 19:08:26] No vqd token found
-[2026-04-16 19:08:26] Saved to CSV
+[2026-04-16 19:18:16] 
+=== Processing: Christian Monique ===
+[2026-04-16 19:18:17] Spotify artist found: Christian Monique
+[2026-04-16 19:18:17] Monthly listeners FOUND: 2059
+[2026-04-16 19:18:17] REQUEST OK → http://ws.audioscrobbler.com/2.0/ (200)
+[2026-04-16 19:18:17] Last.fm data retrieved
+[2026-04-16 19:18:17] REQUEST OK → https://en.wikipedia.org/api/rest_v1/page/summary/Christian%20Monique (403)
+[2026-04-16 19:18:17] REQUEST FAILED → https://en.wikipedia.org/api/rest_v1/page/summary/Christian%20Monique | 403 Client Error: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Christian%20Monique
+[2026-04-16 19:18:17] Wikipedia not found
+[2026-04-16 19:18:18] Instagram found via Last.fm: https://www.instagram.com/last_fm
+[2026-04-16 19:18:18] Saved to CSV
+[2026-04-16 19:18:19] 
+=== Processing: Nullform ===
+[2026-04-16 19:18:19] Spotify artist found: Nullform
+[2026-04-16 19:18:19] Monthly listeners FOUND: 4768
+[2026-04-16 19:18:20] REQUEST OK → http://ws.audioscrobbler.com/2.0/ (200)
+[2026-04-16 19:18:20] Last.fm data retrieved
+[2026-04-16 19:18:20] REQUEST OK → https://en.wikipedia.org/api/rest_v1/page/summary/Nullform (403)
+[2026-04-16 19:18:20] REQUEST FAILED → https://en.wikipedia.org/api/rest_v1/page/summary/Nullform | 403 Client Error: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Nullform
+[2026-04-16 19:18:20] Wikipedia not found
+[2026-04-16 19:18:20] Instagram found via Last.fm: https://www.instagram.com/last_fm
+[2026-04-16 19:18:20] Saved to CSV
+[2026-04-16 19:18:21] 
+=== Processing: Deadwake ===
+[2026-04-16 19:18:21] Spotify artist found: Deadwake
+[2026-04-16 19:18:22] Monthly listeners FOUND: 5302
+[2026-04-16 19:18:23] REQUEST OK → http://ws.audioscrobbler.com/2.0/ (200)
+[2026-04-16 19:18:23] Last.fm data retrieved
+[2026-04-16 19:18:23] REQUEST OK → https://en.wikipedia.org/api/rest_v1/page/summary/Deadwake (403)
+[2026-04-16 19:18:23] REQUEST FAILED → https://en.wikipedia.org/api/rest_v1/page/summary/Deadwake | 403 Client Error: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Deadwake
+[2026-04-16 19:18:23] Wikipedia not found
+[2026-04-16 19:18:23] Instagram found via Last.fm: https://www.instagram.com/last_fm
+[2026-04-16 19:18:23] Saved to CSV
+[2026-04-16 19:18:24] 
+=== Processing: Voltis ===
+[2026-04-16 19:18:24] Spotify artist found: DJ Nexus8
+[2026-04-16 19:18:25] Monthly listeners FOUND: 144141
+[2026-04-16 19:18:25] REQUEST OK → http://ws.audioscrobbler.com/2.0/ (200)
+[2026-04-16 19:18:25] Last.fm data retrieved
+[2026-04-16 19:18:26] REQUEST OK → https://en.wikipedia.org/api/rest_v1/page/summary/Voltis (403)
+[2026-04-16 19:18:26] REQUEST FAILED → https://en.wikipedia.org/api/rest_v1/page/summary/Voltis | 403 Client Error: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Voltis
+[2026-04-16 19:18:26] Wikipedia not found
+[2026-04-16 19:18:26] Instagram found via Last.fm: https://www.instagram.com/last_fm
+[2026-04-16 19:18:26] Saved to CSV
+[2026-04-16 19:18:27] 
+=== Processing: Matthew Sona ===
+[2026-04-16 19:18:27] Spotify artist found: Matthew Santos
+[2026-04-16 19:18:28] Monthly listeners FOUND: 1876
+[2026-04-16 19:18:29] REQUEST OK → http://ws.audioscrobbler.com/2.0/ (200)
+[2026-04-16 19:18:29] Last.fm data retrieved
+[2026-04-16 19:18:29] REQUEST OK → https://en.wikipedia.org/api/rest_v1/page/summary/Matthew%20Sona (403)
+[2026-04-16 19:18:29] REQUEST FAILED → https://en.wikipedia.org/api/rest_v1/page/summary/Matthew%20Sona | 403 Client Error: Forbidden for url: https://en.wikipedia.org/api/rest_v1/page/summary/Matthew%20Sona
+[2026-04-16 19:18:29] Wikipedia not found
+[2026-04-16 19:18:30] Instagram found via Last.fm: https://www.instagram.com/last_fm
+[2026-04-16 19:18:30] Saved to CSV

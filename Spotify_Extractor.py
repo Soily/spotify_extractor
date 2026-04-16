@@ -10,6 +10,19 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 
 # =============================
+# LOGGING
+# =============================
+LOG_FILE = "logfile.txt"
+
+def log(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{timestamp}] {message}"
+    print(line)  # keep console output
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+# =============================
 # LOAD ENV
 # =============================
 load_dotenv()
@@ -36,55 +49,55 @@ def parse_date(date_str):
 def safe_request(url, params=None):
     try:
         response = requests.get(url, params=params, timeout=10)
+        log(f"REQUEST OK → {url} ({response.status_code})")
         response.raise_for_status()
         return response.json()
-    except:
+    except Exception as e:
+        log(f"REQUEST FAILED → {url} | {e}")
         return None
 
 
 # =============================
-# MONTHLY LISTENERS (FIXED)
+# MONTHLY LISTENERS
 # =============================
 def get_monthly_listeners(artist_id):
     url = f"https://open.spotify.com/artist/{artist_id}"
 
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=10)
         html = response.text
 
-        # More robust regex
         match = re.search(r'([0-9.,]+)\s*monthly listeners', html, re.IGNORECASE)
 
         if match:
             listeners = int(match.group(1).replace(",", "").replace(".", ""))
-            print(f"✔ Monthly listeners: {listeners}")
+            log(f"Monthly listeners FOUND: {listeners}")
             return listeners
         else:
-            print("⚠ Monthly listeners not found")
+            log("Monthly listeners NOT found")
 
     except Exception as e:
-        print(f"Monthly listener error: {e}")
+        log(f"Monthly listener error: {e}")
 
     return None
 
 
 # =============================
-# INSTAGRAM (HYBRID)
+# INSTAGRAM
 # =============================
 def find_instagram_profile(artist_name, lastfm_url=None, wiki_url=None):
+
     # Wikipedia
     if wiki_url:
         try:
             html = requests.get(wiki_url, timeout=10).text
             ig = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
             if ig:
+                log(f"Instagram found via Wikipedia: {ig[0]}")
                 return ig[0], 5
-        except:
-            pass
+        except Exception as e:
+            log(f"Wikipedia IG error: {e}")
 
     # Last.fm
     if lastfm_url:
@@ -92,11 +105,12 @@ def find_instagram_profile(artist_name, lastfm_url=None, wiki_url=None):
             html = requests.get(lastfm_url, timeout=10).text
             ig = re.findall(r'https://www\.instagram\.com/[A-Za-z0-9_.]+', html)
             if ig:
+                log(f"Instagram found via Last.fm: {ig[0]}")
                 return ig[0], 4
-        except:
-            pass
+        except Exception as e:
+            log(f"Last.fm IG error: {e}")
 
-    # Heuristic guesses
+    # Heuristic
     clean = re.sub(r'[^a-z0-9]', '', artist_name.lower())
 
     guesses = [
@@ -110,10 +124,12 @@ def find_instagram_profile(artist_name, lastfm_url=None, wiki_url=None):
         try:
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
+                log(f"Instagram guessed: {url}")
                 return url, 3
-        except:
-            pass
+        except Exception as e:
+            log(f"Instagram guess failed ({url}): {e}")
 
+    log("Instagram NOT found")
     return None, 0
 
 
@@ -131,24 +147,32 @@ def get_spotify_client():
 def get_spotify_data(artist_name):
     sp = get_spotify_client()
 
-    results = sp.search(q=artist_name, type="artist", limit=1)
+    try:
+        results = sp.search(q=artist_name, type="artist", limit=1)
 
-    if not results["artists"]["items"]:
+        if not results["artists"]["items"]:
+            log("Spotify: artist not found")
+            return None
+
+        artist = results["artists"]["items"][0]
+        artist_id = artist["id"]
+
+        log(f"Spotify artist found: {artist['name']}")
+
+        data = {
+            "name": artist["name"],
+            "spotify_url": artist["external_urls"]["spotify"],
+            "followers": artist.get("followers", {}).get("total", 0),
+            "popularity": artist.get("popularity", 0),
+            "genres": artist.get("genres", []),
+            "monthly_listeners": get_monthly_listeners(artist_id)
+        }
+
+        return data
+
+    except Exception as e:
+        log(f"Spotify error: {e}")
         return None
-
-    artist = results["artists"]["items"][0]
-    artist_id = artist["id"]
-
-    data = {
-        "name": artist["name"],
-        "spotify_url": artist["external_urls"]["spotify"],
-        "followers": artist.get("followers", {}).get("total", 0),
-        "popularity": artist.get("popularity", 0),
-        "genres": artist.get("genres", []),
-        "monthly_listeners": get_monthly_listeners(artist_id)
-    }
-
-    return data
 
 
 # =============================
@@ -156,6 +180,7 @@ def get_spotify_data(artist_name):
 # =============================
 def get_lastfm_data(artist_name):
     if not LASTFM_API_KEY:
+        log("No Last.fm API key")
         return {}
 
     url = "http://ws.audioscrobbler.com/2.0/"
@@ -168,6 +193,7 @@ def get_lastfm_data(artist_name):
 
     data = safe_request(url, params)
     if not data or "artist" not in data:
+        log("Last.fm: no data")
         return {}
 
     artist = data["artist"]
@@ -179,6 +205,8 @@ def get_lastfm_data(artist_name):
 
     if "url" in artist:
         result["lastfm_url"] = artist["url"]
+
+    log("Last.fm data retrieved")
 
     return result
 
@@ -192,8 +220,10 @@ def get_wikipedia_link(artist_name):
 
     data = safe_request(url)
     if not data:
+        log("Wikipedia not found")
         return None
 
+    log("Wikipedia found")
     return data.get("content_urls", {}).get("desktop", {}).get("page")
 
 
@@ -227,6 +257,8 @@ def save_to_csv(data, filename="artist_data.csv"):
             writer.writeheader()
 
         writer.writerow(flat)
+
+    log("Saved to CSV")
 
 
 # =============================
@@ -265,12 +297,14 @@ def process_artists_from_file(filename):
         artists = [line.strip() for line in f if line.strip()]
 
     for artist in artists:
-        print(f"\nProcessing: {artist}")
+        log(f"\n=== Processing: {artist} ===")
 
         data = get_full_artist_profile(artist)
 
         if data:
             save_to_csv(data)
+        else:
+            log("No data found")
 
         time.sleep(1)
 
