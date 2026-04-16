@@ -1,5 +1,6 @@
 import os
 import csv
+import time
 import requests
 import urllib.parse
 import re
@@ -249,11 +250,9 @@ def flatten_artist_data(data):
         "tags": ", ".join(data.get("tags", []))
     }
 
-    # Top tracks
     top_tracks = data.get("top_tracks", [])
     flat["top_tracks"] = ", ".join([t.get("name", "") for t in top_tracks])
 
-    # Latest release
     latest = data.get("latest_release", {})
     flat["latest_release_name"] = latest.get("name")
     flat["latest_release_date"] = latest.get("release_date")
@@ -296,19 +295,61 @@ def get_full_artist_profile(artist_name):
 
 
 # =============================
+# BATCH PROCESSING
+# =============================
+def process_artists_from_file(filename):
+    if not os.path.isfile(filename):
+        print(f"File not found: {filename}")
+        return
+
+    with open(filename, "r", encoding="utf-8") as f:
+        artists = [line.strip() for line in f if line.strip()]
+
+    print(f"\n📂 Found {len(artists)} artists\n")
+
+    for i, artist_name in enumerate(artists, start=1):
+        print(f"\n[{i}/{len(artists)}] Processing: {artist_name}")
+
+        try:
+            data = get_full_artist_profile(artist_name)
+
+            if not data:
+                print("❌ Not found, skipping.")
+                continue
+
+            save_to_csv(data)
+            print("✅ Saved")
+
+            time.sleep(0.5)  # avoid rate limits
+
+        except Exception as e:
+            print(f"⚠️ Error: {e}")
+            continue
+
+    print("\n🎉 Batch processing complete!")
+
+
+# =============================
 # MAIN
 # =============================
 if __name__ == "__main__":
-    artist_name = input("Artist Name: ").strip()
+    mode = input("Mode (single/batch): ").strip().lower()
 
-    data = get_full_artist_profile(artist_name)
+    if mode == "batch":
+        filename = input("Enter path to artist file (e.g. artists.txt): ").strip()
+        process_artists_from_file(filename)
 
-    if not data:
-        print("Artist nicht gefunden.")
     else:
-        print("\n===== ARTIST PROFILE =====\n")
-        for key, value in data.items():
-            print(f"{key}: {value}")
+        artist_name = input("Artist Name: ").strip()
 
-        save_to_csv(data)
-        print("\n✅ Data saved to artist_data.csv")
+        data = get_full_artist_profile(artist_name)
+
+        if not data:
+            print("Artist nicht gefunden.")
+        else:
+            print("\n===== ARTIST PROFILE =====\n")
+            for key, value in data.items():
+                print(f"{key}: {value}")
+
+            save_to_csv(data)
+            print("\n✅ Data saved to artist_data.csv")
